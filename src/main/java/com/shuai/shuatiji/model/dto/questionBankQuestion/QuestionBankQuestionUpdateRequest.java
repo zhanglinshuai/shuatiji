@@ -18,19 +18,19 @@ public class QuestionBankQuestionUpdateRequest implements Serializable {
     private Long id;
 
     /**
-     * 标题
+     * 题库 id
      */
-    private String title;
+    private Long questionBankId;
 
     /**
-     * 内容
+     * 题目 id
      */
-    private String content;
+    private Long questionId;
 
     /**
-     * 标签列表
+     * 创建用户 id
      */
-    private List<String> tags;
+    private Long userId;
 
     private static final long serialVersionUID = 1L;
 }

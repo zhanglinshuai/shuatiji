@@ -6,7 +6,10 @@ import com.shuai.shuatiji.model.dto.user.UserQueryRequest;
 import com.shuai.shuatiji.model.entity.User;
 import com.shuai.shuatiji.model.vo.LoginUserVO;
 import com.shuai.shuatiji.model.vo.UserVO;
+
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import me.chanjar.weixin.common.bean.WxOAuth2UserInfo;
 
@@ -117,4 +120,19 @@ public interface UserService extends IService<User> {
      */
     QueryWrapper<User> getQueryWrapper(UserQueryRequest userQueryRequest);
 
+
+    /**
+     * 添加用户是否签到
+      * @param userId
+     * @return
+     */
+    boolean addUserSign(long userId);
+
+    /**
+     * 获得用户一年的签到记录
+     * @param userId
+     * @param year
+     * @return
+     */
+   List<Integer> getUserSign(long userId,Integer year);
 }

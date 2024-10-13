@@ -25,6 +25,10 @@ public class QuestionVO implements Serializable {
      * 标题
      */
     private String title;
+    /**
+     * 推荐答案
+     */
+    private String answer;
 
     /**
      * 内容
