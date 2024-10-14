@@ -55,4 +55,11 @@ public interface QuestionService extends IService<Question> {
      * @return
      */
     Page<Question>  listQuestionByPage(QuestionQueryRequest questionQueryRequest);
+
+    /**
+     * 从es中查询题目
+     * @param questionQueryRequest
+     * @return
+     */
+    Page<Question> searchFromEs(QuestionQueryRequest questionQueryRequest);
 }

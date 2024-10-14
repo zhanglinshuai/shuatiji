@@ -3,6 +3,10 @@ package com.shuai.shuatiji.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.shuai.shuatiji.model.entity.Question;
+import org.apache.ibatis.annotations.Select;
+
+import java.util.Date;
+import java.util.List;
 
 /**
 * @author 86175
@@ -12,6 +16,13 @@ import com.shuai.shuatiji.model.entity.Question;
 */
 public interface QuestionMapper extends BaseMapper<Question> {
 
+    /**
+     *
+     * @param minUpdateTime
+     * @return
+     */
+    @Select("select * from question where updateTime>=#{minUpdateTime}")
+    List<Question> listQuestionWithDelete(Date minUpdateTime);
 }
 
 
