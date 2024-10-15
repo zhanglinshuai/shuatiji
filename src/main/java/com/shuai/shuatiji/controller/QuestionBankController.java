@@ -1,5 +1,6 @@
 package com.shuai.shuatiji.controller;
 
+import cn.hutool.core.collection.CollUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.shuai.shuatiji.annotation.AuthCheck;
 import com.shuai.shuatiji.common.BaseResponse;
@@ -9,6 +10,7 @@ import com.shuai.shuatiji.common.ResultUtils;
 import com.shuai.shuatiji.constant.UserConstant;
 import com.shuai.shuatiji.exception.BusinessException;
 import com.shuai.shuatiji.exception.ThrowUtils;
+import com.shuai.shuatiji.mapper.QuestionBankQuestionMapper;
 import com.shuai.shuatiji.model.dto.question.QuestionQueryRequest;
 import com.shuai.shuatiji.model.dto.questionBank.QuestionBankAddRequest;
 import com.shuai.shuatiji.model.dto.questionBank.QuestionBankEditRequest;
@@ -16,6 +18,7 @@ import com.shuai.shuatiji.model.dto.questionBank.QuestionBankQueryRequest;
 import com.shuai.shuatiji.model.dto.questionBank.QuestionBankUpdateRequest;
 import com.shuai.shuatiji.model.entity.Question;
 import com.shuai.shuatiji.model.entity.QuestionBank;
+import com.shuai.shuatiji.model.entity.QuestionBankQuestion;
 import com.shuai.shuatiji.model.entity.User;
 import com.shuai.shuatiji.model.enums.UserRoleEnum;
 import com.shuai.shuatiji.model.vo.QuestionBankVO;
@@ -27,10 +30,15 @@ import lombok.extern.slf4j.Slf4j;
 import net.bytebuddy.implementation.bytecode.Throw;
 import org.apache.xmlbeans.impl.xb.xsdschema.Attribute;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 import static com.shuai.shuatiji.model.enums.UserRoleEnum.ADMIN;
 
@@ -50,6 +58,8 @@ public class QuestionBankController {
 
     @Resource
     private QuestionService questionService;
+    @Autowired
+    private QuestionBankQuestionMapper questionBankQuestionMapper;
 
     // region 增删改查
 
@@ -143,7 +153,7 @@ public class QuestionBankController {
      */
     @GetMapping("/get/vo")
     public BaseResponse<QuestionBankVO> getQuestionBankVOById(QuestionBankQueryRequest questionBankQueryRequest, HttpServletRequest request) {
-        ThrowUtils.throwIf(questionBankQueryRequest==null,ErrorCode.PARAMS_ERROR);
+        ThrowUtils.throwIf(questionBankQueryRequest == null, ErrorCode.PARAMS_ERROR);
         Long id = questionBankQueryRequest.getId();
         ThrowUtils.throwIf(id <= 0, ErrorCode.PARAMS_ERROR);
         // 查询数据库
@@ -154,7 +164,7 @@ public class QuestionBankController {
         QuestionBankVO questionBankVO = questionBankService.getQuestionBankVO(questionBank, request);
 
         //是否要在关联题库下查询题目列表
-        if(needQueryQuestionList){
+        if (needQueryQuestionList) {
             QuestionQueryRequest questionQueryRequest = new QuestionQueryRequest();
             questionQueryRequest.setId(id);
             Page<Question> questionPage = questionService.listQuestionByPage(questionQueryRequest);
@@ -191,7 +201,7 @@ public class QuestionBankController {
      */
     @PostMapping("/list/page/vo")
     public BaseResponse<Page<QuestionBankVO>> listQuestionBankVOByPage(@RequestBody QuestionBankQueryRequest questionBankQueryRequest,
-                                                               HttpServletRequest request) {
+                                                                       HttpServletRequest request) {
         long current = questionBankQueryRequest.getCurrent();
         long size = questionBankQueryRequest.getPageSize();
         // 限制爬虫
@@ -212,7 +222,7 @@ public class QuestionBankController {
      */
     @PostMapping("/my/list/page/vo")
     public BaseResponse<Page<QuestionBankVO>> listMyQuestionBankVOByPage(@RequestBody QuestionBankQueryRequest questionBankQueryRequest,
-                                                                 HttpServletRequest request) {
+                                                                         HttpServletRequest request) {
         ThrowUtils.throwIf(questionBankQueryRequest == null, ErrorCode.PARAMS_ERROR);
         // 补充查询条件，只查询当前登录用户的数据
         User loginUser = userService.getLoginUser(request);

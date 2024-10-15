@@ -1,5 +1,6 @@
 package com.shuai.shuatiji.controller;
 
+import cn.hutool.core.collection.CollUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -11,10 +12,8 @@ import com.shuai.shuatiji.common.ResultUtils;
 import com.shuai.shuatiji.constant.UserConstant;
 import com.shuai.shuatiji.exception.BusinessException;
 import com.shuai.shuatiji.exception.ThrowUtils;
-import com.shuai.shuatiji.model.dto.questionBankQuestion.QuestionBankQuestionAddRequest;
-import com.shuai.shuatiji.model.dto.questionBankQuestion.QuestionBankQuestionQueryRequest;
-import com.shuai.shuatiji.model.dto.questionBankQuestion.QuestionBankQuestionRemoveRequest;
-import com.shuai.shuatiji.model.dto.questionBankQuestion.QuestionBankQuestionUpdateRequest;
+import com.shuai.shuatiji.model.dto.question.QuestionDeleteBatchRequest;
+import com.shuai.shuatiji.model.dto.questionBankQuestion.*;
 import com.shuai.shuatiji.model.entity.QuestionBankQuestion;
 import com.shuai.shuatiji.model.entity.User;
 import com.shuai.shuatiji.model.vo.QuestionBankQuestionVO;
@@ -26,6 +25,7 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.util.List;
 
 /**
  * 题库题目关联表接口
@@ -224,5 +224,37 @@ public class QuestionBankQuestionController {
         return ResultUtils.success(remove);
     }
 
+    /**
+     * 批量将题目添加到题库当中
+     * @param questionBankQuestionAddBatchRequest
+     * @param request
+     * @return
+     */
     // endregion
+    @PostMapping("/add/batch")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public BaseResponse<Boolean> batchAddQuestionToBank(@RequestBody QuestionBankQuestionAddBatchRequest questionBankQuestionAddBatchRequest, HttpServletRequest request) {
+        List<Long> questionIdList = questionBankQuestionAddBatchRequest.getQuestionIdList();
+        Long questionBankId = questionBankQuestionAddBatchRequest.getQuestionBankId();
+        ThrowUtils.throwIf(CollUtil.isEmpty(questionIdList), ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(request);
+        questionBankQuestionService.batchAddAllQuestionToBank(questionIdList,questionBankId,loginUser);
+        return ResultUtils.success(true);
+    }
+
+    /**
+     * 批量从题库中删除题目
+     * @param questionBankQuestionDeleteBatchRequest
+     * @param request
+     * @return
+     */
+    @PostMapping("/delete/batch")
+    public BaseResponse<Boolean> batchDeleteQuestionFromBank(@RequestBody QuestionBankQuestionDeleteBatchRequest questionBankQuestionDeleteBatchRequest, HttpServletRequest request) {
+        ThrowUtils.throwIf(questionBankQuestionDeleteBatchRequest == null, ErrorCode.PARAMS_ERROR);
+        List<Long> questionIdList = questionBankQuestionDeleteBatchRequest.getQuestionIdList();
+        Long questionBankId = questionBankQuestionDeleteBatchRequest.getQuestionBankId();
+        User loginUser = userService.getLoginUser(request);
+        questionBankQuestionService.batchDeleteAllQuestionFromBank(questionIdList,questionBankId,loginUser);
+        return ResultUtils.success(true);
+    }
 }

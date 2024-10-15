@@ -8,7 +8,9 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.shuai.shuatiji.common.ErrorCode;
 import com.shuai.shuatiji.constant.CommonConstant;
+import com.shuai.shuatiji.exception.BusinessException;
 import com.shuai.shuatiji.exception.ThrowUtils;
+import com.shuai.shuatiji.mapper.QuestionBankQuestionMapper;
 import com.shuai.shuatiji.mapper.QuestionMapper;
 import com.shuai.shuatiji.model.dto.question.QuestionQueryRequest;
 import com.shuai.shuatiji.model.entity.Question;
@@ -57,7 +59,7 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question> i
 
 
     @Resource
-    private QuestionBankQuestionService questionBankQuestionService;
+    private QuestionBankQuestionMapper questionBankQuestionMapper;
 
     @Resource
     private ElasticsearchRestTemplate elasticsearchRestTemplate;
@@ -219,7 +221,7 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question> i
             LambdaQueryWrapper<QuestionBankQuestion> questionLambdaQueryWrapper = Wrappers.lambdaQuery(QuestionBankQuestion.class)
                     .select(QuestionBankQuestion::getQuestionId)
                     .eq(QuestionBankQuestion::getQuestionId, questionId);
-            List<QuestionBankQuestion> list = questionBankQuestionService.list(questionLambdaQueryWrapper);
+            List<QuestionBankQuestion> list = questionBankQuestionMapper.selectList(questionLambdaQueryWrapper);
             List<Long> questionList = list.stream()
                     .map(QuestionBankQuestion::getQuestionId)
                     .collect(Collectors.toList());
@@ -242,7 +244,7 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question> i
         Long userId = questionQueryRequest.getUserId();
         String answer = questionQueryRequest.getAnswer();
         Long questionId = questionQueryRequest.getQuestionId();
-        int current = questionQueryRequest.getCurrent()-1;
+        int current = questionQueryRequest.getCurrent() - 1;
         int pageSize = questionQueryRequest.getPageSize();
         String sortField = questionQueryRequest.getSortField();
         String sortOrder = questionQueryRequest.getSortOrder();
@@ -263,7 +265,7 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question> i
             boolQueryBuilder.filter(QueryBuilders.termQuery("questionId", questionId));
         }
         //必须包含所有标签
-        if(CollUtil.isNotEmpty(tags)){
+        if (CollUtil.isNotEmpty(tags)) {
             for (String tag : tags) {
                 boolQueryBuilder.filter(QueryBuilders.termQuery("tags", tag));
             }
@@ -301,5 +303,24 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question> i
         }
         page.setRecords(list);
         return page;
+    }
+
+    @Override
+    public void batchDeleteQuestions(List<Long> questionIdList) {
+        ThrowUtils.throwIf(CollUtil.isEmpty(questionIdList), ErrorCode.PARAMS_ERROR);
+        for (Long questionId : questionIdList) {
+            //从题目中删除信息
+            boolean result = this.removeById(questionId);
+            if (!result) {
+                throw new BusinessException(ErrorCode.OPERATION_ERROR);
+            }
+            LambdaQueryWrapper<QuestionBankQuestion> questionLambdaQueryWrapper = Wrappers.lambdaQuery(QuestionBankQuestion.class)
+                    .eq(QuestionBankQuestion::getQuestionId, questionId);
+            //从题库中删除题目信息
+            int delete = questionBankQuestionMapper.delete(questionLambdaQueryWrapper);
+            if (delete<0) {
+                throw new BusinessException(ErrorCode.OPERATION_ERROR);
+            }
+        }
     }
 }

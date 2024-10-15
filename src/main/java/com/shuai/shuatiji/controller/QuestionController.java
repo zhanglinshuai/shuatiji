@@ -15,10 +15,7 @@ import com.shuai.shuatiji.common.ResultUtils;
 import com.shuai.shuatiji.constant.UserConstant;
 import com.shuai.shuatiji.exception.BusinessException;
 import com.shuai.shuatiji.exception.ThrowUtils;
-import com.shuai.shuatiji.model.dto.question.QuestionAddRequest;
-import com.shuai.shuatiji.model.dto.question.QuestionEditRequest;
-import com.shuai.shuatiji.model.dto.question.QuestionQueryRequest;
-import com.shuai.shuatiji.model.dto.question.QuestionUpdateRequest;
+import com.shuai.shuatiji.model.dto.question.*;
 import com.shuai.shuatiji.model.entity.Question;
 import com.shuai.shuatiji.model.entity.QuestionBankQuestion;
 import com.shuai.shuatiji.model.entity.User;
@@ -27,6 +24,7 @@ import com.shuai.shuatiji.service.QuestionBankQuestionService;
 import com.shuai.shuatiji.service.QuestionService;
 import com.shuai.shuatiji.service.UserService;
 import lombok.extern.slf4j.Slf4j;
+import net.bytebuddy.implementation.bytecode.Throw;
 import org.springframework.beans.BeanUtils;
 import org.springframework.web.bind.annotation.*;
 
@@ -265,6 +263,16 @@ public class QuestionController {
         ThrowUtils.throwIf(size > 200, ErrorCode.PARAMS_ERROR);
         Page<Question> questionPage = questionService.searchFromEs(questionQueryRequest);
         return ResultUtils.success(questionService.getQuestionVOPage(questionPage, request));
+    }
+
+
+    @PostMapping("/delete/batch")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public BaseResponse<Boolean> deleteBatchQuestion(@RequestBody QuestionDeleteBatchRequest questionDeleteBatchRequest, HttpServletRequest request) {
+        ThrowUtils.throwIf(questionDeleteBatchRequest == null, ErrorCode.PARAMS_ERROR);
+        List<Long> questionIdList = questionDeleteBatchRequest.getQuestionIdList();
+        questionService.batchDeleteQuestions(questionIdList);
+        return ResultUtils.success(true);
     }
 
 }
