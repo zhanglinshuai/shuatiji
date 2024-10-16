@@ -1,7 +1,7 @@
 package com.shuai.shuatiji.controller;
 
-import cn.hutool.core.collection.CollUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.jd.platform.hotkey.client.callback.JdHotKeyStore;
 import com.shuai.shuatiji.annotation.AuthCheck;
 import com.shuai.shuatiji.common.BaseResponse;
 import com.shuai.shuatiji.common.DeleteRequest;
@@ -18,29 +18,21 @@ import com.shuai.shuatiji.model.dto.questionBank.QuestionBankQueryRequest;
 import com.shuai.shuatiji.model.dto.questionBank.QuestionBankUpdateRequest;
 import com.shuai.shuatiji.model.entity.Question;
 import com.shuai.shuatiji.model.entity.QuestionBank;
-import com.shuai.shuatiji.model.entity.QuestionBankQuestion;
 import com.shuai.shuatiji.model.entity.User;
-import com.shuai.shuatiji.model.enums.UserRoleEnum;
 import com.shuai.shuatiji.model.vo.QuestionBankVO;
 import com.shuai.shuatiji.model.vo.QuestionVO;
 import com.shuai.shuatiji.service.QuestionBankService;
 import com.shuai.shuatiji.service.QuestionService;
 import com.shuai.shuatiji.service.UserService;
 import lombok.extern.slf4j.Slf4j;
-import net.bytebuddy.implementation.bytecode.Throw;
-import org.apache.xmlbeans.impl.xb.xsdschema.Attribute;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 
-import java.util.List;
-import java.util.stream.Collectors;
-
-import static com.shuai.shuatiji.model.enums.UserRoleEnum.ADMIN;
+import static com.shuai.shuatiji.constant.HotKeyConstants.BANK_HOT_KET_PREFIX;
 
 /**
  * 题库接口
@@ -156,21 +148,36 @@ public class QuestionBankController {
         ThrowUtils.throwIf(questionBankQueryRequest == null, ErrorCode.PARAMS_ERROR);
         Long id = questionBankQueryRequest.getId();
         ThrowUtils.throwIf(id <= 0, ErrorCode.PARAMS_ERROR);
+
+        //使用hot-key进行热点缓存
+        String key = BANK_HOT_KET_PREFIX + id;
+        //首先判断是不是热key
+        if (JdHotKeyStore.isHotKey(key)) {
+            //如果是热key，从本地缓存中取出值
+            Object cachedQuestionBankVo = JdHotKeyStore.get(key);
+            if (cachedQuestionBankVo != null) {
+                return ResultUtils.success((QuestionBankVO) cachedQuestionBankVo);
+            }
+        }
+        //todo 还可以设置redis缓存，进行多级缓存，使程序的稳定性更高
+
         // 查询数据库
         QuestionBank questionBank = questionBankService.getById(id);
         ThrowUtils.throwIf(questionBank == null, ErrorCode.NOT_FOUND_ERROR);
         Boolean needQueryQuestionList = questionBankQueryRequest.getNeedQueryQuestionList();
         //查询题库封装类
         QuestionBankVO questionBankVO = questionBankService.getQuestionBankVO(questionBank, request);
-
         //是否要在关联题库下查询题目列表
-        if (needQueryQuestionList) {
+        if (needQueryQuestionList!=null && needQueryQuestionList) {
             QuestionQueryRequest questionQueryRequest = new QuestionQueryRequest();
             questionQueryRequest.setId(id);
             Page<Question> questionPage = questionService.listQuestionByPage(questionQueryRequest);
             Page<QuestionVO> questionVOPage = questionService.getQuestionVOPage(questionPage, request);
             questionBankVO.setQuestions(questionVOPage);
         }
+        //如果是热点key，才会执行该行代码，设置本地缓存
+        JdHotKeyStore.smartSet(key, questionBankVO);
+
         // 获取封装类
         return ResultUtils.success(questionBankVO);
     }
