@@ -2,6 +2,12 @@ package com.shuai.shuatiji.controller;
 
 import cn.hutool.core.lang.func.LambdaUtil;
 import cn.hutool.json.JSONUtil;
+import com.alibaba.csp.sentinel.Entry;
+import com.alibaba.csp.sentinel.EntryType;
+import com.alibaba.csp.sentinel.SphU;
+import com.alibaba.csp.sentinel.Tracer;
+import com.alibaba.csp.sentinel.slots.block.BlockException;
+import com.alibaba.csp.sentinel.slots.block.degrade.DegradeException;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.LambdaUtils;
@@ -31,6 +37,8 @@ import org.springframework.web.bind.annotation.*;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.util.List;
+
+import static com.shuai.shuatiji.constant.SentinelConstant.listQuestionVoByPage;
 
 /**
  * 题目接口
@@ -66,7 +74,7 @@ public class QuestionController {
         Question question = new Question();
         BeanUtils.copyProperties(questionAddRequest, question);
         List<String> tags = questionAddRequest.getTags();
-        if(tags != null){
+        if (tags != null) {
             question.setTags(JSONUtil.toJsonStr(tags));
         }
         // 数据校验
@@ -172,7 +180,7 @@ public class QuestionController {
 
     /**
      * 分页获取题目列表（封装类）
-     *
+     *  对该接口进行限流处理，并且进行熔断降级操作
      * @param questionQueryRequest
      * @param request
      * @return
@@ -180,16 +188,48 @@ public class QuestionController {
     @PostMapping("/list/page/vo")
     public BaseResponse<Page<QuestionVO>> listQuestionVOByPage(@RequestBody QuestionQueryRequest questionQueryRequest,
                                                                HttpServletRequest request) {
+        // 基于 IP 限流
+        String remoteAddr = request.getRemoteAddr();
+        Entry entry = null;
         long current = questionQueryRequest.getCurrent();
         long size = questionQueryRequest.getPageSize();
         // 限制爬虫
         ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR);
-        // 查询数据库
-        Page<Question> questionPage = questionService.page(new Page<>(current, size),
-                questionService.getQueryWrapper(questionQueryRequest));
-        // 获取封装类
-        return ResultUtils.success(questionService.getQuestionVOPage(questionPage, request));
+        try {
+            entry = SphU.entry(listQuestionVoByPage, EntryType.IN, 1, remoteAddr);
+            // 被保护的业务逻辑
+            // 查询数据库
+            Page<Question> questionPage = questionService.page(new Page<>(current, size),
+                    questionService.getQueryWrapper(questionQueryRequest));
+            // 获取封装类
+            return ResultUtils.success(questionService.getQuestionVOPage(questionPage, request));
+        } catch (Throwable ex) {
+            // 业务异常
+            if (!BlockException.isBlockException(ex)) {
+                Tracer.trace(ex);
+                return ResultUtils.error(ErrorCode.SYSTEM_ERROR, "系统错误");
+            }
+            // 降级操作
+            if (ex instanceof DegradeException) {
+                return handleFallback(questionQueryRequest, request, ex);
+            }
+            // 限流操作
+            return ResultUtils.error(ErrorCode.SYSTEM_ERROR, "访问过于频繁，请稍后再试");
+        } finally {
+            if (entry != null) {
+                entry.exit(1, remoteAddr);
+            }
+        }
     }
+
+    public BaseResponse<Page<QuestionVO>> handleFallback(QuestionQueryRequest questionQueryRequest,HttpServletRequest request,Throwable ex){
+        //可以返回空数据或者本地数据
+        return ResultUtils.success(null);
+    }
+
+
+
+
 
     /**
      * 分页获取当前登录用户创建的题目列表
@@ -233,7 +273,7 @@ public class QuestionController {
         Question question = new Question();
         BeanUtils.copyProperties(questionEditRequest, question);
         List<String> tags = questionEditRequest.getTags();
-        if(tags != null){
+        if (tags != null) {
             question.setTags(JSONUtil.toJsonStr(tags));
         }
         // 数据校验

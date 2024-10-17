@@ -1,5 +1,8 @@
 package com.shuai.shuatiji.controller;
 
+import com.alibaba.csp.sentinel.annotation.SentinelResource;
+import com.alibaba.csp.sentinel.slots.block.BlockException;
+import com.alibaba.csp.sentinel.slots.block.degrade.DegradeException;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.jd.platform.hotkey.client.callback.JdHotKeyStore;
 import com.shuai.shuatiji.annotation.AuthCheck;
@@ -33,6 +36,7 @@ import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 
 import static com.shuai.shuatiji.constant.HotKeyConstants.BANK_HOT_KET_PREFIX;
+import static com.shuai.shuatiji.constant.SentinelConstant.listQuestionBankVoByPage;
 
 /**
  * 题库接口
@@ -168,7 +172,7 @@ public class QuestionBankController {
         //查询题库封装类
         QuestionBankVO questionBankVO = questionBankService.getQuestionBankVO(questionBank, request);
         //是否要在关联题库下查询题目列表
-        if (needQueryQuestionList!=null && needQueryQuestionList) {
+        if (needQueryQuestionList != null && needQueryQuestionList) {
             QuestionQueryRequest questionQueryRequest = new QuestionQueryRequest();
             questionQueryRequest.setId(id);
             Page<Question> questionPage = questionService.listQuestionByPage(questionQueryRequest);
@@ -207,6 +211,11 @@ public class QuestionBankController {
      * @return
      */
     @PostMapping("/list/page/vo")
+    @SentinelResource(
+            value = listQuestionBankVoByPage,
+            blockHandler = "handleBlockException",
+            fallback = "handleFallback"
+    )
     public BaseResponse<Page<QuestionBankVO>> listQuestionBankVOByPage(@RequestBody QuestionBankQueryRequest questionBankQueryRequest,
                                                                        HttpServletRequest request) {
         long current = questionBankQueryRequest.getCurrent();
@@ -219,6 +228,33 @@ public class QuestionBankController {
         // 获取封装类
         return ResultUtils.success(questionBankService.getQuestionBankVOPage(questionBankPage, request));
     }
+
+
+    /**
+     * listQuestionBankVOByPage 降级操作：直接返回本地数据
+     * 处理Sentinel业务异常
+     */
+    public BaseResponse<Page<QuestionBankVO>> handleFallback(@RequestBody QuestionBankQueryRequest questionBankQueryRequest,
+                                                             HttpServletRequest request, Throwable ex) {
+        // 可以返回本地数据或空数据
+        return ResultUtils.success(null);
+    }
+    /**
+     * listQuestionBankVOByPage 流控操作
+     * 限流：提示“系统压力过大，请耐心等待”
+     * 熔断：执行降级操作
+     * 处理Sentinel的流控异常
+     */
+    public BaseResponse<Page<QuestionBankVO>> handleBlockException(@RequestBody QuestionBankQueryRequest questionBankQueryRequest,
+                                                                   HttpServletRequest request, BlockException ex) {
+        // 降级操作
+        if (ex instanceof DegradeException) {
+            return handleFallback(questionBankQueryRequest, request, ex);
+        }
+        // 限流操作
+        return ResultUtils.error(ErrorCode.SYSTEM_ERROR, "系统压力过大，请耐心等待");
+    }
+
 
     /**
      * 分页获取当前登录用户创建的题库列表
