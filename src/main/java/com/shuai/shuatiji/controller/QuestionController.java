@@ -38,8 +38,6 @@ import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.util.List;
 
-import static com.shuai.shuatiji.constant.SentinelConstant.listQuestionVoByPage;
-
 /**
  * 题目接口
  */
@@ -180,7 +178,7 @@ public class QuestionController {
 
     /**
      * 分页获取题目列表（封装类）
-     *  对该接口进行限流处理，并且进行熔断降级操作
+     *
      * @param questionQueryRequest
      * @param request
      * @return
@@ -188,16 +186,13 @@ public class QuestionController {
     @PostMapping("/list/page/vo")
     public BaseResponse<Page<QuestionVO>> listQuestionVOByPage(@RequestBody QuestionQueryRequest questionQueryRequest,
                                                                HttpServletRequest request) {
-        // 基于 IP 限流
         String remoteAddr = request.getRemoteAddr();
         Entry entry = null;
-        long current = questionQueryRequest.getCurrent();
-        long size = questionQueryRequest.getPageSize();
-        // 限制爬虫
-        ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR);
         try {
-            entry = SphU.entry(listQuestionVoByPage, EntryType.IN, 1, remoteAddr);
-            // 被保护的业务逻辑
+            long current = questionQueryRequest.getCurrent();
+            long size = questionQueryRequest.getPageSize();
+            // 限制爬虫
+            ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR);
             // 查询数据库
             Page<Question> questionPage = questionService.page(new Page<>(current, size),
                     questionService.getQueryWrapper(questionQueryRequest));
@@ -221,14 +216,9 @@ public class QuestionController {
             }
         }
     }
-
-    public BaseResponse<Page<QuestionVO>> handleFallback(QuestionQueryRequest questionQueryRequest,HttpServletRequest request,Throwable ex){
-        //可以返回空数据或者本地数据
+    public BaseResponse<Page<QuestionVO>> handleFallback(QuestionQueryRequest questionQueryRequest, HttpServletRequest request, Throwable ex) {
         return ResultUtils.success(null);
     }
-
-
-
 
 
     /**

@@ -34,8 +34,10 @@ public class SentinelRulesManager {
             listenRules();
         }
 
-        // 限流规则
-        public void initFlowRules() {
+    /**
+     * listQuestionVoByPage的限流规则
+     */
+    public void initFlowRules() {
             // 单 IP 查看题目列表限流规则
             ParamFlowRule rule = new ParamFlowRule(listQuestionVoByPage)
                     .setParamIdx(0) // 对第 0 个参数限流，即 IP 地址
@@ -44,8 +46,10 @@ public class SentinelRulesManager {
             ParamFlowRuleManager.loadRules(Collections.singletonList(rule));
         }
 
-        // 降级规则
-        public void initDegradeRules() {
+    /**
+     * listQuestionVoByPage的熔断，降级规则
+     */
+    public void initDegradeRules() {
             // 单 IP 查看题目列表熔断规则
             DegradeRule slowCallRule = new DegradeRule(listQuestionVoByPage)
                     .setGrade(CircuitBreakerStrategy.SLOW_REQUEST_RATIO.getType())
