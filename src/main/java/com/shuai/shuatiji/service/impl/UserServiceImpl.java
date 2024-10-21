@@ -2,6 +2,7 @@ package com.shuai.shuatiji.service.impl;
 
 import static com.shuai.shuatiji.constant.UserConstant.USER_LOGIN_STATE;
 
+import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.collection.CollUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -15,6 +16,7 @@ import com.shuai.shuatiji.model.entity.User;
 import com.shuai.shuatiji.model.enums.UserRoleEnum;
 import com.shuai.shuatiji.model.vo.LoginUserVO;
 import com.shuai.shuatiji.model.vo.UserVO;
+import com.shuai.shuatiji.satoken.DeviceUtils;
 import com.shuai.shuatiji.service.UserService;
 import com.shuai.shuatiji.utils.SqlUtils;
 
@@ -116,8 +118,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             log.info("user login failed, userAccount cannot match userPassword");
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户不存在或密码错误");
         }
+        //用户登录，并记录登录设备
+        StpUtil.login(user.getId(), DeviceUtils.getRequestDevice(request));
         // 3. 记录用户的登录态
-        request.getSession().setAttribute(USER_LOGIN_STATE, user);
+        StpUtil.getSession().set(USER_LOGIN_STATE,user);
         return this.getLoginUserVO(user);
     }
 
@@ -161,19 +165,17 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
      */
     @Override
     public User getLoginUser(HttpServletRequest request) {
-        // 先判断是否已登录
-        Object userObj = request.getSession().getAttribute(USER_LOGIN_STATE);
-        User currentUser = (User) userObj;
-        if (currentUser == null || currentUser.getId() == null) {
+        //判断是否登录
+        Object loginId = StpUtil.getLoginIdDefaultNull();
+        if (loginId == null) {
             throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
         }
-        // 从数据库查询（追求性能的话可以注释，直接走缓存）
-        long userId = currentUser.getId();
-        currentUser = this.getById(userId);
-        if (currentUser == null) {
+        //从数据库查询
+        User user = this.getById((String) loginId);
+        if (user == null) {
             throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
         }
-        return currentUser;
+        return user;
     }
 
     /**
@@ -204,8 +206,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     @Override
     public boolean isAdmin(HttpServletRequest request) {
         // 仅管理员可查询
-        Object userObj = request.getSession().getAttribute(USER_LOGIN_STATE);
-        User user = (User) userObj;
+        User user = (User) StpUtil.getSession().get(USER_LOGIN_STATE);
         return isAdmin(user);
     }
 
@@ -221,11 +222,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
      */
     @Override
     public boolean userLogout(HttpServletRequest request) {
-        if (request.getSession().getAttribute(USER_LOGIN_STATE) == null) {
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "未登录");
-        }
-        // 移除登录态
-        request.getSession().removeAttribute(USER_LOGIN_STATE);
+        StpUtil.checkLogin();
+        //移除登录态
+        StpUtil.logout(request);
         return true;
     }
 
